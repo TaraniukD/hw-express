@@ -7,11 +7,22 @@ const HttpError = require("../../helpers");
 const router = express.Router();
 
 const addSchema = joi.object({
-  id: joi.string().required(),
-  name: joi.string().required(),
-  email: joi.string().required(),
-  phone: joi.string().required(),
+  name: joi.string().min(3).max(18).required(),
+  email: joi.string().email({
+    minDomainSegments: 2,
+    tlds: { allow: ["com", "net"] },
+  }).required(),
+  phone: joi.string().min(10).max(15).required(),
 })
+
+const updateSchema = joi.object({
+  name: joi.string().min(3).max(18),
+  email: joi.string().email({
+    minDomainSegments: 2,
+    tlds: { allow: ["com", "net"] },
+  }),
+  phone: joi.string().min(10).max(15),
+});
 
 router.get('/', async (req, res, next) => {
   try {
@@ -59,7 +70,7 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:contactId', async (req, res, next) => {
   try {
-    const {error} = addSchema.validate(req.body);
+    const {error} = updateSchema.validate(req.body);
 
     if (error) {
       throw HttpError(400, error.message)

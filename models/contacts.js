@@ -34,18 +34,30 @@ const addContact = async (body) => {
   return newContact;
 }
 
-const updateContact = async (contactId, body) => {
+const updateContact = async (id, body) => {
 const contacts = await listContacts();
-const index = contacts.findIndex(item => item.id === contactId);
+const contact = contacts.find(item => item.id === id);
 
-if (index === -1) {
-  return null;
-}
+const { name, email, phone } = body;
 
-contacts[index] = {contactId, ...body};
+if (contact) {
+  contacts.forEach((item) => {
+    if (item.id === id) {
+      if (name) {
+        item.name = name;
+      }
+      if (email) {
+        item.email = email;
+      }
+      if (phone) {
+        item.phone = phone;
+      }
+    }
+  });
+
 await fs.writeFile(contactsPath, JSON.stringify(contacts, null, 2));
-
-return contacts[index];
+}
+return contact;
 }
 
 module.exports = {
