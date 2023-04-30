@@ -3,13 +3,16 @@ const {Contact} = require("../../models/contact");
 const {addSchema, updateSchema, updateFavoriteSchema} = require("../../models/contact")
 
 const {HttpError} = require("../../helpers");
-const {isValidId} = require("../../middlewares/isValid")
+const {isValidId, authenticate} = require("../../middlewares")
 
 const router = express.Router();
 
-router.get('/', async (req, res, next) => {
+router.get('/', authenticate, async (req, res, next) => {
   try {
-    const result = await Contact.find();
+    const {_id: owner} = req.user;
+    const {page = 1, limit = 10} = req.query;
+    const skip = (page - 1) * limit;
+    const result = await Contact.find({owner}, "-createdAt -updatedAt", {skip, limit}).populate("owner", "name email");
   res.json(result)
   } 
   catch (error) {
@@ -17,7 +20,7 @@ router.get('/', async (req, res, next) => {
   }
 })
 
-router.get('/:contactId', isValidId, async (req, res, next) => {
+router.get('/:contactId', isValidId, authenticate, async (req, res, next) => {
  try {
   const {contactId} = req.params;
 
@@ -35,7 +38,7 @@ router.get('/:contactId', isValidId, async (req, res, next) => {
  }
 })
 
-router.post('/', async (req, res, next) => {
+router.post('/', authenticate, async (req, res, next) => {
   try {
     const {error} = addSchema.validate(req.body);
 
@@ -43,7 +46,9 @@ router.post('/', async (req, res, next) => {
       throw HttpError(400, error.message)
     }
 
-    const result = await Contact.create(req.body);
+    const {_id: owner} = req.user;
+    const result = await Contact.create({...req.body, owner });
+
     res.status(201).json(result);
   } 
   catch (error) {
@@ -51,7 +56,7 @@ router.post('/', async (req, res, next) => {
   }
 })
 
-router.put('/:contactId', isValidId, async (req, res, next) => {
+router.put('/:contactId', authenticate, isValidId, async (req, res, next) => {
   try {
     const {error} = updateSchema.validate(req.body);
 
@@ -72,7 +77,7 @@ router.put('/:contactId', isValidId, async (req, res, next) => {
   }
 })
 
-router.patch('/:contactId/favorite', isValidId, async (req, res, next) => {
+router.patch('/:contactId/favorite', authenticate, isValidId, async (req, res, next) => {
   try {
     const {error} = updateFavoriteSchema.validate(req.body);
 
@@ -93,7 +98,7 @@ router.patch('/:contactId/favorite', isValidId, async (req, res, next) => {
   }
 })
 
-router.delete('/:contactId', isValidId, async (req, res, next) => {
+router.delete('/:contactId', authenticate, isValidId, async (req, res, next) => {
   try {
     const {contactId} = req.params;
     const result = await Contact.findByIdAndDelete(contactId)
@@ -110,4 +115,4 @@ router.delete('/:contactId', isValidId, async (req, res, next) => {
 })
 
 
-module.exports = router
+module.exports = router;
