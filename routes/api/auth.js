@@ -2,15 +2,18 @@ const express = require("express");
 const bcryptjs = require("bcryptjs");
 const jwt = require('jsonwebtoken');
 const gravatar = require("gravatar");
+const {nanoid} = require("nanoid");
 
 const {User} = require("../../models/user");
 const {authenticate, upload} = require("../../middlewares");
 const ctrl = require("../../controllers/authAvatars")
 const {schemas} = require("../../models/user");
-const {HttpError} = require("../../helpers");
+const {HttpError, sendEmail} = require("../../helpers");
 const {SECRET_KEY} = process.env;
 
 const router = express.Router();
+
+// ------- register and verify user ---------------------------------------------
 
 router.post("/register", async (req, res, next) => {
     const {email, password} = req.body;
@@ -28,8 +31,17 @@ router.post("/register", async (req, res, next) => {
 
         const hashPassword = await bcryptjs.hash(password, 10);
         const avatarURL = gravatar.url(email);
+        const verificationCode = nanoid();
     
-        const newUser = await User.create({...req.body, password: hashPassword, avatarURL});
+        const newUser = await User.create({
+          ...req.body,
+          password: hashPassword,
+          avatarURL,
+          verificationCode
+        });
+
+        await sendEmail(email, verificationCode);
+
         res.status(201).json({
             email: newUser.email,
             name: newUser.name,
@@ -40,6 +52,57 @@ router.post("/register", async (req, res, next) => {
         next(error)
       }
 });
+
+router.get("/verify/:verificationCode", async (req, res, next) => {
+try {
+  const {verificationCode} = req.params;
+
+  const user = await User.findOne({verificationCode});
+  if (!user) {
+    throw HttpError(401, "User not found")
+  }
+
+  await User.findOneAndUpdate(user._id, {verify: true, verificationCode: ""});
+
+  res.json({
+    message: "Verification successful"
+  })
+} catch (error) {
+  next(error)
+}
+});
+
+router.post("/verify", async (req, res, next) => {
+  try {
+  const {error} = schemas.emailSchema.validate(req.body);
+
+    if (error) {
+      throw HttpError(400, error.message)
+    }
+
+    const {email} = req.body;
+    const user = await User.findOne({email});
+    const verificationCode = user.verificationCode;
+  
+    if (!user) {
+      throw HttpError(400, "missing required field email")
+    }
+    if (user.verify) {
+      throw HttpError(400, "Verification has already been passed")
+    }
+  
+    await sendEmail(email, verificationCode);
+
+    res.json({
+      message: "Verification email send success"
+    })
+
+  } catch (error) {
+    next(error)
+  }
+})
+
+// ----------- login user --------------------------------------------------
 
 router.post("/login", async (req, res, next) => {
   const {email, password} = req.body;
@@ -53,6 +116,10 @@ router.post("/login", async (req, res, next) => {
   
   if (error) {
       throw HttpError(400, error.message)
+    }
+  
+  if(!user.verify) {
+      throw HttpError(401, "email not verified")
     }
 
 const passwordCompare = await bcryptjs.compare(password, user.password);
@@ -79,6 +146,8 @@ await User.findByIdAndUpdate(user._id, {token});
     }
 });
 
+// ------------ current user ---------------------------------
+
 router.post("/current", authenticate, async (req, res, next) => {
   try {
   const {email, name} = req.user;
@@ -92,6 +161,8 @@ router.post("/current", authenticate, async (req, res, next) => {
     next(error)
   }
 })
+
+// ------------ logout user ---------------------------------
 
 router.post("/logout", authenticate, async (req, res, next) => {
   try {
@@ -108,6 +179,8 @@ router.post("/logout", authenticate, async (req, res, next) => {
       next(error)
     }
 })
+
+// ------------- avatars ---------------------------------------
 
 router.patch("/avatars", authenticate, upload.single("avatar"), ctrl.updateAvatar);
 
