@@ -7,6 +7,7 @@ const {isValidId, authenticate} = require("../../middlewares")
 
 const router = express.Router();
 
+// ---------------- get all ---------------------------------
 router.get('/', authenticate, async (req, res, next) => {
   try {
     const {_id: owner} = req.user;
@@ -24,6 +25,7 @@ router.get('/', authenticate, async (req, res, next) => {
   }
 })
 
+// --------------- get one -------------------------------------
 router.get('/:contactId', authenticate, isValidId,  async (req, res, next) => {
  try {
   const {_id: owner} = req.user;
@@ -42,6 +44,8 @@ router.get('/:contactId', authenticate, isValidId,  async (req, res, next) => {
  }
 })
 
+//  ---------------- post contact ----------------------------
+
 router.post('/', authenticate, async (req, res, next) => {
   try {
     const {error} = addSchema.validate(req.body);
@@ -59,6 +63,8 @@ router.post('/', authenticate, async (req, res, next) => {
     next(error)
   }
 })
+
+//  ------------------ update -------------------------------------------
 
 router.put('/:contactId', authenticate, isValidId, async (req, res, next) => {
   try {
@@ -103,6 +109,8 @@ router.patch('/:contactId/favorite', authenticate, isValidId, async (req, res, n
     next(error)
   }
 })
+
+//  ----------------- delete ----------------------------------------------
 
 router.delete('/:contactId', authenticate, isValidId, async (req, res, next) => {
   try {
